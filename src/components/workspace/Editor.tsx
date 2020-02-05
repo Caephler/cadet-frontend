@@ -6,6 +6,8 @@ import sharedbAce from 'sharedb-ace';
 import 'brace/ext/searchbox';
 import 'brace/mode/javascript';
 import './editorTheme/source';
+import { parse } from './parser';
+import createContext from 'js-slang/dist/createContext';
 
 import { LINKS } from '../../utils/constants';
 import { checkSessionIdExists } from './collabEditing/helper';
@@ -32,6 +34,50 @@ export interface IEditorProps {
   handleUpdateHasUnsavedChanges?: (hasUnsavedChanges: boolean) => void;
 }
 
+let parseArray: any = [];
+let blocks: any = [];
+
+function parseCode(code: string) {
+  const parsed: any = parse(code, createContext(1));
+  if (!parsed) {
+    // parse error, ignore
+    return;
+  }
+  [parseArray, blocks] = parseAndSave(parsed.body);
+  console.log('parseArray', parseArray);
+  console.log('blocks', blocks);
+}
+
+function parseAndSave(parsedArrayBlocks: any) {
+  const parseArray = parsedArrayBlocks
+    .filter((x: any) => x.type === 'VariableDeclaration')
+    .map((x: any) => ({
+      identifier: x.declarations[0].id.name
+    }));
+
+  const blocks = parsedArrayBlocks
+    .filter((x: any) => x.type === 'BlockStatement')
+    .map((x: any) => ({
+      start: x.loc.start.line - 1, // to preserve 0-indexing
+      end: x.loc.end.line - 1, // to preserve 0-indexing
+      env: parseAndSave(x.body)
+    }));
+
+  return [parseArray, blocks];
+}
+
+// function getLineOf(code: string, position: number) {
+//   const lines = code.split('\n');
+//   let pos = 0;
+//   let line = 0;
+//   while (pos <= position) {
+//     pos += lines[line].length;
+//     line += 1;
+//   }
+
+//   return line - 1;
+// }
+
 class Editor extends React.PureComponent<IEditorProps, {}> {
   public ShareAce: any;
   public AceEditor: React.RefObject<AceEditor>;
@@ -43,6 +89,7 @@ class Editor extends React.PureComponent<IEditorProps, {}> {
     this.AceEditor = React.createRef();
     this.ShareAce = null;
     this.onChangeMethod = (newCode: string) => {
+      console.log(parseCode(newCode));
       if (this.props.handleUpdateHasUnsavedChanges) {
         this.props.handleUpdateHasUnsavedChanges(true);
       }
