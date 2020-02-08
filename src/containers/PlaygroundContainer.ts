@@ -38,6 +38,7 @@ import Playground, { IDispatchProps, IStateProps } from '../components/Playgroun
 import { IState, SideContentType } from '../reducers/states';
 
 const mapStateToProps: MapStateToProps<IStateProps, {}, IState> = state => ({
+  chapterNumber: state.workspaces.playground.context.chapter,
   editorSessionId: state.workspaces.playground.editorSessionId,
   editorWidth: state.workspaces.playground.editorWidth,
   editorValue: state.workspaces.playground.editorValue!,
