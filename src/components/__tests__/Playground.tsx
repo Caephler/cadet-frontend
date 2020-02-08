@@ -7,6 +7,7 @@ import { ExternalLibraryName, ExternalLibraryNames } from '../assessment/assessm
 import Playground, { IPlaygroundProps } from '../Playground';
 
 const baseProps = {
+  chapterNumber: 1,
   editorValue: '',
   execTime: 1000,
   breakpoints: [],

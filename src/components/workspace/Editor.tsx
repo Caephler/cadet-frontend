@@ -9,6 +9,7 @@ import './editorTheme/source';
 
 import { LINKS } from '../../utils/constants';
 import { checkSessionIdExists } from './collabEditing/helper';
+import FloatingHelper from './FloatingHelper';
 /**
  * @property editorValue - The string content of the react-ace editor
  * @property handleEditorChange  - A callback function
@@ -17,6 +18,7 @@ import { checkSessionIdExists } from './collabEditing/helper';
  *           of the editor's content, using `slang`
  */
 export interface IEditorProps {
+  chapterNumber?: number;
   breakpoints: string[];
   editorSessionId: string;
   editorValue: string;
@@ -32,7 +34,11 @@ export interface IEditorProps {
   handleUpdateHasUnsavedChanges?: (hasUnsavedChanges: boolean) => void;
 }
 
-class Editor extends React.PureComponent<IEditorProps, {}> {
+type OwnState = {
+  lastCursorPosition: { row: number; column: number };
+};
+
+class Editor extends React.PureComponent<IEditorProps, OwnState> {
   public ShareAce: any;
   public AceEditor: React.RefObject<AceEditor>;
   private onChangeMethod: (newCode: string) => void;
@@ -40,6 +46,9 @@ class Editor extends React.PureComponent<IEditorProps, {}> {
 
   constructor(props: IEditorProps) {
     super(props);
+    this.state = {
+      lastCursorPosition: { row: 0, column: 0 }
+    };
     this.AceEditor = React.createRef();
     this.ShareAce = null;
     this.onChangeMethod = (newCode: string) => {
@@ -128,40 +137,55 @@ class Editor extends React.PureComponent<IEditorProps, {}> {
 
   public render() {
     return (
-      <HotKeys className="Editor" handlers={handlers}>
-        <div className="row editor-react-ace">
-          <AceEditor
-            className="react-ace"
-            commands={[
-              {
-                name: 'evaluate',
-                bindKey: {
-                  win: 'Shift-Enter',
-                  mac: 'Shift-Enter'
-                },
-                exec: this.props.handleEditorEval
-              }
-            ]}
-            editorProps={{
-              $blockScrolling: Infinity
-            }}
-            ref={this.AceEditor}
-            markers={this.getMarkers()}
-            fontSize={17}
-            height="100%"
-            highlightActiveLine={false}
-            mode="javascript"
-            onChange={this.onChangeMethod}
-            onValidate={this.onValidateMethod}
-            theme="source"
-            value={this.props.editorValue}
-            width="100%"
-            setOptions={{
-              fontFamily: "'Inconsolata', 'Consolas', monospace"
-            }}
-          />
-        </div>
-      </HotKeys>
+      <>
+        <HotKeys className="Editor" handlers={handlers}>
+          <div className="row editor-react-ace">
+            <AceEditor
+              className="react-ace"
+              commands={[
+                {
+                  name: 'evaluate',
+                  bindKey: {
+                    win: 'Shift-Enter',
+                    mac: 'Shift-Enter'
+                  },
+                  exec: this.props.handleEditorEval
+                }
+              ]}
+              onCursorChange={selection => {
+                this.setState({
+                  lastCursorPosition: selection.getCursor()
+                });
+              }}
+              editorProps={{
+                $blockScrolling: Infinity
+              }}
+              ref={this.AceEditor}
+              markers={this.getMarkers()}
+              fontSize={17}
+              height="100%"
+              highlightActiveLine={false}
+              mode="javascript"
+              onChange={this.onChangeMethod}
+              onValidate={this.onValidateMethod}
+              theme="source"
+              value={this.props.editorValue}
+              width="100%"
+              setOptions={{
+                fontFamily: "'Inconsolata', 'Consolas', monospace"
+              }}
+            />
+          </div>
+        </HotKeys>
+        <FloatingHelper
+          editorCursor={this.state.lastCursorPosition}
+          jumpTo={(row, col) => {
+            const editor = (this.AceEditor.current as any).editor;
+            editor.navigateTo(row, col);
+            editor.focus();
+          }}
+        />
+      </>
     );
   }
 

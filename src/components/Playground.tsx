@@ -50,6 +50,7 @@ the REPL.
 export interface IPlaygroundProps extends IDispatchProps, IStateProps, RouteComponentProps<{}> {}
 
 export interface IStateProps {
+  chapterNumber: number;
   editorSessionId: string;
   editorValue: string;
   editorHeight?: number;
@@ -263,6 +264,7 @@ class Playground extends React.Component<IPlaygroundProps, PlaygroundState> {
         replButtons: [evalButton, clearButton]
       },
       editorProps: {
+        chapterNumber: this.props.chapterNumber,
         editorValue: this.props.editorValue,
         editorSessionId: this.props.editorSessionId,
         handleEditorEval: this.props.handleEditorEval,
