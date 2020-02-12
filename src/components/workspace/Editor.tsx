@@ -10,6 +10,7 @@ import './editorTheme/source';
 import { LINKS } from '../../utils/constants';
 import { checkSessionIdExists } from './collabEditing/helper';
 import FloatingHelper from './FloatingHelper';
+import EditorWrapper from './EditorWrapper';
 /**
  * @property editorValue - The string content of the react-ace editor
  * @property handleEditorChange  - A callback function
@@ -34,8 +35,13 @@ export interface IEditorProps {
   handleUpdateHasUnsavedChanges?: (hasUnsavedChanges: boolean) => void;
 }
 
+type CursorPosition = {
+  row: number;
+  column: number;
+}
+
 type OwnState = {
-  lastCursorPosition: { row: number; column: number };
+  lastCursorPosition: CursorPosition;
 };
 
 class Editor extends React.PureComponent<IEditorProps, OwnState> {
@@ -43,6 +49,7 @@ class Editor extends React.PureComponent<IEditorProps, OwnState> {
   public AceEditor: React.RefObject<AceEditor>;
   private onChangeMethod: (newCode: string) => void;
   private onValidateMethod: (annotations: Annotation[]) => void;
+  private getEditor: () => any;
 
   constructor(props: IEditorProps) {
     super(props);
@@ -62,6 +69,14 @@ class Editor extends React.PureComponent<IEditorProps, OwnState> {
         this.props.handleEditorEval();
       }
     };
+    this.getEditor = () => {
+      const ref = this.AceEditor.current as any;
+      if (!ref) {
+        return null;
+      } else {
+        return ref.editor;
+      }
+    }
   }
 
   public getBreakpoints() {
@@ -139,7 +154,7 @@ class Editor extends React.PureComponent<IEditorProps, OwnState> {
     return (
       <>
         <HotKeys className="Editor" handlers={handlers}>
-          <div className="row editor-react-ace">
+          <EditorWrapper editor={this.getEditor()}>
             <AceEditor
               className="react-ace"
               commands={[
@@ -175,7 +190,7 @@ class Editor extends React.PureComponent<IEditorProps, OwnState> {
                 fontFamily: "'Inconsolata', 'Consolas', monospace"
               }}
             />
-          </div>
+          </EditorWrapper>
         </HotKeys>
         <FloatingHelper
           editorCursor={this.state.lastCursorPosition}

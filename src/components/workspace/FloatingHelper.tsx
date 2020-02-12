@@ -93,7 +93,7 @@ class FloatingHelper extends React.Component<IFloatingHelperProps, OwnState> {
               text="Find"
               onClick={() => {
                 this.log(
-                  `Searching code for variable ${this.state.searchVar} at (row, col): (${this.props.editorCursor.row}, ${this.props.editorCursor.column})`
+                  `Searching code for variable ${this.state.searchVar} at (row, col): (${this.props.editorCursor.row + 1}, ${this.props.editorCursor.column})`
                 );
                 const parsedProgram = parse(
                   this.props.editorValue,
@@ -107,6 +107,7 @@ class FloatingHelper extends React.Component<IFloatingHelperProps, OwnState> {
                 const result = lookupDefinition(
                   this.state.searchVar,
                   this.props.editorCursor.row + 1,
+                  this.props.editorCursor.column,
                   scoped
                 );
 
