@@ -39,7 +39,7 @@ export interface IEditorProps {
 type CursorPosition = {
   row: number;
   column: number;
-}
+};
 
 type OwnState = {
   lastCursorPosition: CursorPosition;
@@ -77,7 +77,7 @@ class Editor extends React.PureComponent<IEditorProps, OwnState> {
       } else {
         return ref.editor;
       }
-    }
+    };
   }
 
   public getBreakpoints() {
