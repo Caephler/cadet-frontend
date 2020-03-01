@@ -11,6 +11,7 @@ import { LINKS } from '../../utils/constants';
 import { checkSessionIdExists } from './collabEditing/helper';
 import FloatingHelper from './FloatingHelper';
 import EditorWrapper from './EditorWrapper';
+import { Position } from './languageUtils';
 /**
  * @property editorValue - The string content of the react-ace editor
  * @property handleEditorChange  - A callback function
@@ -35,13 +36,9 @@ export interface IEditorProps {
   handleUpdateHasUnsavedChanges?: (hasUnsavedChanges: boolean) => void;
 }
 
-type CursorPosition = {
-  row: number;
-  column: number;
-};
-
 type OwnState = {
-  lastCursorPosition: CursorPosition;
+  lastCursorPosition: Position;
+  onCursorChangeCallbacks: ((pos: Position) => void)[];
 };
 
 class Editor extends React.PureComponent<IEditorProps, OwnState> {
@@ -50,11 +47,13 @@ class Editor extends React.PureComponent<IEditorProps, OwnState> {
   private onChangeMethod: (newCode: string) => void;
   private onValidateMethod: (annotations: Annotation[]) => void;
   private getEditor: () => any;
+  private addOnCursorChangeCallback: (callback: (pos: Position) => void) => void;
 
   constructor(props: IEditorProps) {
     super(props);
     this.state = {
-      lastCursorPosition: { row: 0, column: 0 }
+      lastCursorPosition: { row: 0, column: 0 },
+      onCursorChangeCallbacks: []
     };
     this.AceEditor = React.createRef();
     this.ShareAce = null;
@@ -76,6 +75,12 @@ class Editor extends React.PureComponent<IEditorProps, OwnState> {
       } else {
         return ref.editor;
       }
+    };
+    this.addOnCursorChangeCallback = (callback: (pos: Position) => void) => {
+      this.setState(prevState => ({
+        ...prevState,
+        onCursorChangeCallbacks: [...prevState.onCursorChangeCallbacks, callback]
+      }));
     };
   }
 
@@ -154,7 +159,10 @@ class Editor extends React.PureComponent<IEditorProps, OwnState> {
     return (
       <>
         <HotKeys className="Editor" handlers={handlers}>
-          <EditorWrapper editor={this.getEditor()}>
+          <EditorWrapper
+            editor={this.getEditor()}
+            addOnCursorChangeCallback={this.addOnCursorChangeCallback}
+          >
             <AceEditor
               className="react-ace"
               commands={[
@@ -171,6 +179,7 @@ class Editor extends React.PureComponent<IEditorProps, OwnState> {
                 this.setState({
                   lastCursorPosition: selection.getCursor()
                 });
+                this.state.onCursorChangeCallbacks.forEach(f => f(selection.getCursor()));
               }}
               editorProps={{
                 $blockScrolling: Infinity
