@@ -37,104 +37,111 @@ const { Range } = ace.acequire('ace/range');
 
 class EditorWrapper extends React.Component<IEditorWrapperProps, {}> {
   private getClosestScoped: (pos: Position) => void;
-  private getAllOccurrences: (pos: Position) => void;
+  private selectAllOccurrences: (pos: Position) => void;
+  private parseProgram: () => any;
+  private getMatchingTokens: (pos: Position, types: string[]) => any;
+  private doesMatchType: (token: { type: string }, types: string[]) => boolean;
 
   constructor(props: IEditorWrapperProps) {
     super(props);
+    const identifierTypes = ['identifier', 'variable.parameter', 'entity.name.function'];
 
-    this.getAllOccurrences = (pos: Position) => {
-      if (!this.props.editor || !pos) {
+    this.parseProgram = () => {
+      if (!this.props.editor) {
         return;
       }
 
       const parsedProgram = parse(this.props.editorValue, createContext(this.props.chapterNumber));
+      return parsedProgram;
+    };
+
+    this.doesMatchType = (token: { type: string }, types: string[]) => {
+      if (!token) {
+        return false;
+      }
+      return types.reduce((matched, type) => matched || type === token.type, false);
+    };
+
+    this.getMatchingTokens = (pos: Position, types: string[]) => {
+      if (!pos) {
+        return;
+      }
+
       const editSession = this.props.editor.getSession();
       // We get the tokens around as well, just to be sure
       const centerToken = editSession.getTokenAt(pos.row, pos.column);
       const leftToken = editSession.getTokenAt(pos.row, Math.max(pos.column - 1, 0));
       const rightToken = editSession.getTokenAt(pos.row, pos.column + 1);
 
-      // Check if token is identifier
-      if (!centerToken || !leftToken || !rightToken) {
+      const tokenArr = [centerToken, leftToken, rightToken];
+      return tokenArr.filter(token => token && this.doesMatchType(token, types));
+    };
+
+    this.selectAllOccurrences = (pos: Position) => {
+      const parsedProgram = this.parseProgram();
+      if (parsedProgram === undefined) {
+        // TODO: Alert user that the program could not be parsed.
         return;
       }
 
-      const tokenArr = [centerToken, leftToken, rightToken];
-      for (let token of tokenArr) {
-        if (token.type === 'identifier') {
-          const tokenName = token.value;
-          // We need 1-indexed row here
-          const result = getAllOccurrencesInScope(
-            tokenName,
-            pos.row + 1,
-            pos.column,
-            parsedProgram!
-          );
-          if (!result) {
-            continue;
-          }
-
-          console.log(result);
-          result.forEach(loc => {
-            const range = {
-              startRow: loc.start.line - 1, // loc is 1-indexed, range is 0-indexed.
-              startColumn: loc.start.column,
-              endRow: loc.start.line - 1,
-              endColumn: loc.end.column
-            };
-            const aceRange = new Range(
-              range.startRow,
-              range.startColumn,
-              range.endRow,
-              range.endColumn
-            );
-            const selection = this.props.editor.getSelection();
-            selection.addRange(aceRange);
-          });
-          this.props.editor.focus();
-
-          break;
+      const matchedTokens = this.getMatchingTokens(pos, identifierTypes);
+      for (let token of matchedTokens) {
+        const tokenName = token.value;
+        const result = getAllOccurrencesInScope(tokenName, pos.row + 1, pos.column, parsedProgram!);
+        // We need 1-indexed row here
+        if (!result) {
+          continue;
         }
+
+        result.forEach(loc => {
+          const range = {
+            startRow: loc.start.line - 1, // loc is 1-indexed, range is 0-indexed.
+            startColumn: loc.start.column,
+            endRow: loc.start.line - 1,
+            endColumn: loc.end.column
+          };
+          const aceRange = new Range(
+            range.startRow,
+            range.startColumn,
+            range.endRow,
+            range.endColumn
+          );
+          const selection = this.props.editor.getSelection();
+          selection.addRange(aceRange);
+        });
+        this.props.editor.focus();
+
+        break;
       }
     };
 
     this.getClosestScoped = (pos: Position) => {
-      if (!this.props.editor || !pos) {
+      const parsedProgram = this.parseProgram();
+      if (parsedProgram === undefined) {
+        // TODO: Alert user that the program could not be parsed.
         return;
       }
-
-      const parsedProgram = parse(this.props.editorValue, createContext(this.props.chapterNumber));
       const scopedProgram = scopeVariables(parsedProgram as any);
-      const editSession = this.props.editor.getSession();
-      // We get the tokens around as well, just to be sure
-      const centerToken = editSession.getTokenAt(pos.row, pos.column);
-      const leftToken = editSession.getTokenAt(pos.row, Math.max(pos.column - 1, 0));
-      const rightToken = editSession.getTokenAt(pos.row, pos.column + 1);
-
-      // Check if token is identifier
-      if (!centerToken || !leftToken || !rightToken) {
+      if (!scopedProgram) {
+        console.log('unable to scope program');
         return;
       }
-
-      const tokenArr = [centerToken, leftToken, rightToken];
-      for (let token of tokenArr) {
-        if (token.type === 'identifier') {
-          const tokenName = token.value;
-          // We need 1-indexed row here
-          const result = lookupDefinition(tokenName, pos.row + 1, pos.column, scopedProgram);
-          if (!result) {
-            continue;
-          }
-
-          const resRow = result.loc!.start.line;
-          const resCol = result.loc!.start.column;
-
-          console.log(`${tokenName} found at line ${resRow}, col ${resCol}`);
-          // navigateTo expects 0-indexed row, but we are dealing with 1-indexed rows.
-          this.props.editor.navigateTo(resRow - 1, resCol);
-          this.props.editor.focus();
-          break;
+      const matchedTokens = this.getMatchingTokens(pos, identifierTypes);
+      for (let token of matchedTokens) {
+        const tokenName = token.value;
+        // We need 1-indexed row here
+        const result = lookupDefinition(tokenName, pos.row + 1, pos.column, scopedProgram);
+        if (!result) {
+          continue;
         }
+
+        const resRow = result.loc!.start.line;
+        const resCol = result.loc!.start.column;
+
+        // navigateTo expects 0-indexed row, but we are dealing with 1-indexed rows.
+        this.props.editor.navigateTo(resRow - 1, resCol);
+        this.props.editor.focus();
+        break;
       }
     };
   }
@@ -147,11 +154,11 @@ class EditorWrapper extends React.Component<IEditorWrapperProps, {}> {
           {
             label: 'Refactor',
             fn: (pos: Position) => {
-              this.getAllOccurrences(pos);
+              this.selectAllOccurrences(pos);
             }
           },
           {
-            label: 'Go to definition',
+            label: 'Go to declaration',
             fn: (pos: Position) => {
               this.getClosestScoped(pos);
             }
