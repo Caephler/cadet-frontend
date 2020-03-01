@@ -1,15 +1,8 @@
 import * as React from 'react';
 import { MapStateToProps, connect } from 'react-redux';
-import {
-  createContext,
-  lookupDefinition,
-  scopeVariables
-  // getAllOccurrencesInScope
-} from 'js-slang';
-import { parse } from 'js-slang/dist/parser';
 import { IState } from 'src/reducers/states';
 import IDEContextMenuHandler from './IDEContextMenuHandler';
-import { getAllOccurrencesInScope } from 'js-slang/dist/scoped-vars';
+import { getAllOccurrencesAtCursor, getClosestScoped, Position } from './languageUtils';
 
 interface IEditorWrapperProps extends IStateProps, OwnProps {}
 export interface IStateProps {
@@ -19,130 +12,98 @@ export interface IStateProps {
 
 export interface OwnProps {
   editor: any;
-  children: React.ReactNodeArray | React.ReactNode;
+  addOnCursorChangeCallback: (callback: (pos: Position) => void) => void;
 }
 
-type Position = {
-  row: number;
-  column: number;
-};
+export interface OwnState {
+  markerIds: number[];
+}
 
-// We need to create a [Range](https://ace.c9.io/#nav=api&api=range) object
-// But react-ace does not expose the constructor, so we will use a hacky way to obtain
-// the constructor.
-const ace = (() => {
-  return (window as any).ace;
-})() as any;
-const { Range } = ace.acequire('ace/range');
-
-class EditorWrapper extends React.Component<IEditorWrapperProps, {}> {
+class EditorWrapper extends React.Component<IEditorWrapperProps, OwnState> {
   private getClosestScoped: (pos: Position) => void;
   private selectAllOccurrences: (pos: Position) => void;
-  private parseProgram: () => any;
-  private getMatchingTokens: (pos: Position, types: string[]) => any;
-  private doesMatchType: (token: { type: string }, types: string[]) => boolean;
+  private highlightVariables: (pos: Position) => void;
+
+  componentDidMount() {
+    this.props.addOnCursorChangeCallback(pos => {
+      this.highlightVariables(pos);
+    });
+  }
 
   constructor(props: IEditorWrapperProps) {
     super(props);
-    const identifierTypes = ['identifier', 'variable.parameter', 'entity.name.function'];
-
-    this.parseProgram = () => {
-      if (!this.props.editor) {
-        return;
-      }
-
-      const parsedProgram = parse(this.props.editorValue, createContext(this.props.chapterNumber));
-      return parsedProgram;
-    };
-
-    this.doesMatchType = (token: { type: string }, types: string[]) => {
-      if (!token) {
-        return false;
-      }
-      return types.reduce((matched, type) => matched || type === token.type, false);
-    };
-
-    this.getMatchingTokens = (pos: Position, types: string[]) => {
-      if (!pos) {
-        return;
-      }
-
-      const editSession = this.props.editor.getSession();
-      // We get the tokens around as well, just to be sure
-      const centerToken = editSession.getTokenAt(pos.row, pos.column);
-      const leftToken = editSession.getTokenAt(pos.row, Math.max(pos.column - 1, 0));
-      const rightToken = editSession.getTokenAt(pos.row, pos.column + 1);
-
-      const tokenArr = [centerToken, leftToken, rightToken];
-      return tokenArr.filter(token => token && this.doesMatchType(token, types));
+    this.state = {
+      markerIds: []
     };
 
     this.selectAllOccurrences = (pos: Position) => {
-      const parsedProgram = this.parseProgram();
-      if (parsedProgram === undefined) {
-        // TODO: Alert user that the program could not be parsed.
+      const editor = this.props.editor;
+      const code = this.props.editorValue;
+      if (!editor) {
         return;
       }
-
-      const matchedTokens = this.getMatchingTokens(pos, identifierTypes);
-      for (let token of matchedTokens) {
-        const tokenName = token.value;
-        const result = getAllOccurrencesInScope(tokenName, pos.row + 1, pos.column, parsedProgram!);
-        // We need 1-indexed row here
-        if (!result) {
-          continue;
-        }
-
-        result.forEach(loc => {
-          const range = {
-            startRow: loc.start.line - 1, // loc is 1-indexed, range is 0-indexed.
-            startColumn: loc.start.column,
-            endRow: loc.start.line - 1,
-            endColumn: loc.end.column
-          };
-          const aceRange = new Range(
-            range.startRow,
-            range.startColumn,
-            range.endRow,
-            range.endColumn
-          );
-          const selection = this.props.editor.getSelection();
-          selection.addRange(aceRange);
-        });
-        this.props.editor.focus();
-
-        break;
+      const ranges = getAllOccurrencesAtCursor(
+        code,
+        editor.getSession(),
+        pos,
+        this.props.chapterNumber
+      );
+      if (!ranges) {
+        return;
       }
+      const selection = editor.getSelection();
+      ranges.forEach(range => selection.addRange(range));
+      editor.focus();
     };
 
     this.getClosestScoped = (pos: Position) => {
-      const parsedProgram = this.parseProgram();
-      if (parsedProgram === undefined) {
-        // TODO: Alert user that the program could not be parsed.
+      const editor = this.props.editor;
+      const code = this.props.editorValue;
+      const positionOfDecl = getClosestScoped(
+        code,
+        editor.getSession(),
+        pos,
+        this.props.chapterNumber
+      ); // navigateTo expects 0-indexed row, but we are dealing with 1-indexed rows.
+      if (!positionOfDecl) {
         return;
       }
-      const scopedProgram = scopeVariables(parsedProgram as any);
-      if (!scopedProgram) {
-        console.log('unable to scope program');
-        return;
-      }
-      const matchedTokens = this.getMatchingTokens(pos, identifierTypes);
-      for (let token of matchedTokens) {
-        const tokenName = token.value;
-        // We need 1-indexed row here
-        const result = lookupDefinition(tokenName, pos.row + 1, pos.column, scopedProgram);
-        if (!result) {
-          continue;
+      this.props.editor.navigateTo(positionOfDecl.row - 1, positionOfDecl.column);
+      this.props.editor.focus();
+    };
+
+    this.highlightVariables = (pos: Position) => {
+      // using Ace Editor's way of highlighting as seen here: https://github.com/ajaxorg/ace/blob/master/lib/ace/editor.js#L497
+      // We use async blocks so we don't block the browser during editing
+
+      setTimeout(() => {
+        const editor = this.props.editor;
+        const session = editor.session;
+        const code = this.props.editorValue;
+        const chapterNumber = this.props.chapterNumber;
+        if (!session || !session.bgTokenizer) {
+          return;
+        }
+        this.state.markerIds.forEach(id => {
+          session.removeMarker(id);
+        });
+        const ranges = getAllOccurrencesAtCursor(code, session, pos, chapterNumber);
+        if (!ranges) {
+          this.setState({
+            markerIds: []
+          });
+          return;
         }
 
-        const resRow = result.loc!.start.line;
-        const resCol = result.loc!.start.column;
-
-        // navigateTo expects 0-indexed row, but we are dealing with 1-indexed rows.
-        this.props.editor.navigateTo(resRow - 1, resCol);
-        this.props.editor.focus();
-        break;
-      }
+        const markerType = 'ace_bracket';
+        const markerIds = ranges.map(range => {
+          // returns the marker ID for removal later
+          return session.addMarker(range, markerType, 'text');
+        });
+        this.setState({
+          markerIds
+        });
+      }, 50);
     };
   }
 
@@ -162,6 +123,12 @@ class EditorWrapper extends React.Component<IEditorWrapperProps, {}> {
             fn: (pos: Position) => {
               this.getClosestScoped(pos);
             }
+          },
+          {
+            label: 'Highlight',
+            fn: (pos: Position) => {
+              this.highlightVariables(pos);
+            }
           }
         ]}
       >
@@ -176,4 +143,5 @@ const mapStateToProps: MapStateToProps<IStateProps, {}, IState> = state => ({
   editorValue: state.workspaces.playground.editorValue!
 });
 
-export default connect(mapStateToProps)(EditorWrapper);
+const ConnectedEditorWrapper = connect(mapStateToProps)(EditorWrapper);
+export default ConnectedEditorWrapper;
