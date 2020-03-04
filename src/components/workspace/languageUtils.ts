@@ -32,25 +32,28 @@ export const doesMatchType = (token: { type: string }, types: string[]) => {
   return types.reduce((matched, type) => matched || type === token.type, false);
 };
 
-export const getMatchingTokens = (session: any, pos: Position, types: string[]): any => {
+export const getMatchingTokens = (
+  session: any,
+  pos: Position,
+  types: string[],
+  offsets: number[] = [-1, 0, 1]
+): any => {
   if (!pos) {
     return;
   }
 
-  // We get the tokens around as well, just to be sure
-  const centerToken = session.getTokenAt(pos.row, pos.column);
-  const leftToken = session.getTokenAt(pos.row, Math.max(pos.column - 1, 0));
-  const rightToken = session.getTokenAt(pos.row, pos.column + 1);
-
-  const tokenArr = [centerToken, leftToken, rightToken];
-  return tokenArr.filter(token => token && doesMatchType(token, types));
+  const tokens = offsets.map(offset =>
+    session.getTokenAt(pos.row, Math.max(pos.column + offset, 0))
+  );
+  return tokens.filter(token => token && doesMatchType(token, types));
 };
 
 export const getAllOccurrencesAtCursor = (
   code: string,
   session: any,
   pos: Position,
-  chapterNumber: number
+  chapterNumber: number,
+  offsetsToCheck: number[] = [-1, 0, 1]
 ) => {
   const parsedProgram = parseProgram(code, chapterNumber);
   if (parsedProgram === undefined) {
@@ -58,7 +61,7 @@ export const getAllOccurrencesAtCursor = (
     return;
   }
 
-  const matchedTokens = getMatchingTokens(session, pos, identifierTypes);
+  const matchedTokens = getMatchingTokens(session, pos, identifierTypes, offsetsToCheck);
   for (let token of matchedTokens) {
     const tokenName = token.value;
     const result = getAllOccurrencesInScope(tokenName, pos.row + 1, pos.column, parsedProgram!);
