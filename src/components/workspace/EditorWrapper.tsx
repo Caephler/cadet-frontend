@@ -30,6 +30,12 @@ class EditorWrapper extends React.Component<IEditorWrapperProps, OwnState> {
     });
   }
 
+  componentWillReceiveProps(nextProps: IEditorWrapperProps) {
+    if (nextProps.editorValue !== this.props.editorValue) {
+      this.highlightVariables(this.props.editor.getSelection().getCursor());
+    }
+  }
+
   constructor(props: IEditorWrapperProps) {
     super(props);
     this.state = {
@@ -87,7 +93,7 @@ class EditorWrapper extends React.Component<IEditorWrapperProps, OwnState> {
         this.state.markerIds.forEach(id => {
           session.removeMarker(id);
         });
-        const ranges = getAllOccurrencesAtCursor(code, session, pos, chapterNumber);
+        const ranges = getAllOccurrencesAtCursor(code, session, pos, chapterNumber, [0]);
         if (!ranges) {
           this.setState({
             markerIds: []
@@ -95,7 +101,7 @@ class EditorWrapper extends React.Component<IEditorWrapperProps, OwnState> {
           return;
         }
 
-        const markerType = 'ace_bracket';
+        const markerType = 'ace_variable_highlighting';
         const markerIds = ranges.map(range => {
           // returns the marker ID for removal later
           return session.addMarker(range, markerType, 'text');
@@ -103,7 +109,7 @@ class EditorWrapper extends React.Component<IEditorWrapperProps, OwnState> {
         this.setState({
           markerIds
         });
-      }, 50);
+      }, 10);
     };
   }
 
@@ -122,12 +128,6 @@ class EditorWrapper extends React.Component<IEditorWrapperProps, OwnState> {
             label: 'Go to declaration',
             fn: (pos: Position) => {
               this.getClosestScoped(pos);
-            }
-          },
-          {
-            label: 'Highlight',
-            fn: (pos: Position) => {
-              this.highlightVariables(pos);
             }
           }
         ]}
