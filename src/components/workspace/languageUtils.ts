@@ -4,7 +4,7 @@ import {
   scopeVariables,
   getAllOccurrencesInScope
 } from 'js-slang';
-import { parse } from 'js-slang/dist/parser';
+import { parse, looseParse } from 'js-slang/dist/parser';
 
 export type Position = {
   row: number;
@@ -22,7 +22,11 @@ const identifierTypes = ['identifier', 'variable.parameter', 'entity.name.functi
 export { Range };
 
 export const parseProgram = (code: string, chapterNumber: number) => {
-  return parse(code, createContext(chapterNumber));
+  const program = parse(code, createContext(chapterNumber));
+  if (program == null) {
+    return looseParse(code, createContext(chapterNumber));
+  }
+  return program;
 };
 
 export const doesMatchType = (token: { type: string }, types: string[]) => {
@@ -56,10 +60,6 @@ export const getAllOccurrencesAtCursor = (
   offsetsToCheck: number[] = [-1, 0, 1]
 ) => {
   const parsedProgram = parseProgram(code, chapterNumber);
-  if (parsedProgram === undefined) {
-    // TODO: Alert user that the program could not be parsed.
-    return;
-  }
 
   const matchedTokens = getMatchingTokens(session, pos, identifierTypes, offsetsToCheck);
   for (let token of matchedTokens) {
@@ -94,10 +94,7 @@ export const getClosestScoped = (
   chapterNumber: number
 ): Position | undefined => {
   const parsedProgram = parseProgram(code, chapterNumber);
-  if (parsedProgram === undefined) {
-    // TODO: Alert user that the program could not be parsed.
-    return;
-  }
+
   const scopedProgram = scopeVariables(parsedProgram as any);
   if (!scopedProgram) {
     console.log('unable to scope program');
