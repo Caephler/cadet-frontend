@@ -43,7 +43,7 @@ export const getMatchingTokens = (
   types: string[],
   offsets: number[] = [-1, 0, 1]
 ): any => {
-  if (!pos) {
+  if (!session || !pos) {
     return;
   }
 
@@ -58,7 +58,7 @@ export const getAllOccurrencesAtCursor = (
   session: any,
   pos: Position,
   chapterNumber: number,
-  offsetsToCheck: number[] = [-1, 0, 1]
+  offsetsToCheck: number[] = [0]
 ) => {
   const parsedProgram = parseProgram(code, chapterNumber);
 
@@ -145,3 +145,11 @@ export const getClosestScoped = (
   // no match
   return;
 };
+
+export const isIdentifierType = (
+  session: any,
+  pos: Position,
+): boolean => {
+  const matchedTokens = getMatchingTokens(session, pos, identifierTypes, [-1, 0, 1]);
+  return matchedTokens.length > 0;
+}

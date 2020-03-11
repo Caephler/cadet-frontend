@@ -2,7 +2,7 @@ import * as React from 'react';
 import { MapStateToProps, connect } from 'react-redux';
 import { IState } from 'src/reducers/states';
 import IDEContextMenuHandler from './IDEContextMenuHandler';
-import { getAllOccurrencesAtCursor, getClosestScoped, Position } from './languageUtils';
+import { getAllOccurrencesAtCursor, getClosestScoped, Position, isIdentifierType } from './languageUtils';
 
 interface IEditorWrapperProps extends IStateProps, OwnProps {}
 export interface IStateProps {
@@ -22,6 +22,7 @@ export interface OwnState {
 
 class EditorWrapper extends React.Component<IEditorWrapperProps, OwnState> {
   private getClosestScoped: (pos: Position) => void;
+  private getAllInstances: (pos: Position) => any[] | undefined;
   private selectAllOccurrences: (pos: Position) => void;
   private highlightVariables: (pos: Position) => void;
 
@@ -43,7 +44,7 @@ class EditorWrapper extends React.Component<IEditorWrapperProps, OwnState> {
       markerIds: []
     };
 
-    this.selectAllOccurrences = (pos: Position) => {
+    this.getAllInstances = (pos: Position) => {
       const editor = this.props.editor;
       const code = this.props.editorValue;
       if (!editor) {
@@ -55,6 +56,13 @@ class EditorWrapper extends React.Component<IEditorWrapperProps, OwnState> {
         pos,
         this.props.chapterNumber
       );
+
+      return ranges;
+    }
+
+    this.selectAllOccurrences = (pos: Position) => {
+      const editor = this.props.editor;
+      const ranges = this.getAllInstances(pos);
       if (!ranges) {
         return;
       }
@@ -124,12 +132,18 @@ class EditorWrapper extends React.Component<IEditorWrapperProps, OwnState> {
             label: 'Refactor',
             fn: (pos: Position) => {
               this.selectAllOccurrences(pos);
+            },
+            shouldBeShown: (pos: Position) => {
+              return this.getAllInstances(pos) !== undefined;
             }
           },
           {
             label: 'Go to declaration',
             fn: (pos: Position) => {
               this.getClosestScoped(pos);
+            },
+            shouldBeShown: (pos: Position) => {
+              return isIdentifierType(this.props.editor.getSession(), pos);
             }
           }
         ]}

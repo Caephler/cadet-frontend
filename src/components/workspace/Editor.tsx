@@ -9,7 +9,6 @@ import './editorTheme/source';
 
 import { LINKS } from '../../utils/constants';
 import { checkSessionIdExists } from './collabEditing/helper';
-import FloatingHelper from './FloatingHelper';
 import EditorWrapper from './EditorWrapper';
 import { Position } from './languageUtils';
 /**
@@ -201,14 +200,6 @@ class Editor extends React.PureComponent<IEditorProps, OwnState> {
             />
           </EditorWrapper>
         </HotKeys>
-        <FloatingHelper
-          editorCursor={this.state.lastCursorPosition}
-          jumpTo={(row, col) => {
-            const editor = (this.AceEditor.current as any).editor;
-            editor.navigateTo(row, col);
-            editor.focus();
-          }}
-        />
       </>
     );
   }

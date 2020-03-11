@@ -17,6 +17,7 @@ export interface IStateProps {
 export interface MenuItem {
   label: string;
   fn: (position: Position) => void;
+  shouldBeShown: (position: Position) => boolean;
 }
 
 type Position = {
@@ -68,6 +69,8 @@ class IDEContextMenuHandler extends React.Component<IIDEContextMenuHandlerProps,
       if (!this.state.isContextMenuOpen) {
         return null;
       }
+      const pos = this.props.editor.getCursorPosition() as Position;
+      const shownMenuItems = this.props.menuItems.filter(item => item.shouldBeShown(pos));
       return (
         <div
           style={{
@@ -91,21 +94,27 @@ class IDEContextMenuHandler extends React.Component<IIDEContextMenuHandlerProps,
               zIndex: 1001
             }}
           >
-            {this.props.menuItems.map((item: MenuItem, i) => (
-              <div
-                key={i}
-                style={{
-                  cursor: 'pointer',
-                  padding: '4px'
-                }}
-                onClick={() => {
-                  this.closeContextMenu();
-                  item.fn(this.state.coordsWhenOpened);
-                }}
-              >
-                <Text>{item.label}</Text>
+            {shownMenuItems.map((item: MenuItem, i) => (
+                <div
+                  key={i}
+                  style={{
+                    cursor: 'pointer',
+                    padding: '4px'
+                  }}
+                  onClick={() => {
+                    this.closeContextMenu();
+                    item.fn(this.state.coordsWhenOpened);
+                  }}
+                >
+                  <Text>{item.label}</Text>
+                </div>
+            )
+            )}
+            {shownMenuItems.length === 0 ? (
+              <div style={{ padding: '4px' }}>
+                <Text><em>No actions available</em></Text>
               </div>
-            ))}
+            ) : null }
           </Card>
         </div>
       );
