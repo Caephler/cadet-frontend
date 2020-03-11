@@ -7,6 +7,7 @@ import { getAllOccurrencesAtCursor, getClosestScoped, Position } from './languag
 interface IEditorWrapperProps extends IStateProps, OwnProps {}
 export interface IStateProps {
   chapterNumber: number;
+  externalLib: string;
   editorValue: string;
 }
 
@@ -69,7 +70,8 @@ class EditorWrapper extends React.Component<IEditorWrapperProps, OwnState> {
         code,
         editor.getSession(),
         pos,
-        this.props.chapterNumber
+        this.props.chapterNumber,
+        this.props.externalLib
       ); // navigateTo expects 0-indexed row, but we are dealing with 1-indexed rows.
       if (!positionOfDecl) {
         return;
@@ -140,6 +142,7 @@ class EditorWrapper extends React.Component<IEditorWrapperProps, OwnState> {
 
 const mapStateToProps: MapStateToProps<IStateProps, {}, IState> = state => ({
   chapterNumber: state.workspaces.playground.context.chapter,
+  externalLib: state.workspaces.playground.externalLibrary,
   editorValue: state.workspaces.playground.editorValue!
 });
 
