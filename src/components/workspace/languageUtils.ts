@@ -5,6 +5,7 @@ import {
   getAllOccurrencesInScope
 } from 'js-slang';
 import { parse, looseParse } from 'js-slang/dist/parser';
+import * as libDeclarations from './lib.json';
 
 export type Position = {
   row: number;
@@ -91,7 +92,8 @@ export const getClosestScoped = (
   code: string,
   session: any,
   pos: Position,
-  chapterNumber: number
+  chapterNumber: number,
+  externalLib: string
 ): Position | undefined => {
   const parsedProgram = parseProgram(code, chapterNumber);
 
@@ -103,6 +105,28 @@ export const getClosestScoped = (
   const matchedTokens = getMatchingTokens(session, pos, identifierTypes);
   for (let token of matchedTokens) {
     const tokenName = token.value;
+    // First check whether token is in library definitions
+    const source_version = `source_${chapterNumber}`;
+    if (libDeclarations[source_version] !== undefined) {
+      const link = libDeclarations[source_version][tokenName];
+      if (link !== undefined) {
+        // go to link
+        window.open(link, "_blank", "noopener noreferrer");
+        console.log(`go to ${link}`);
+        return;
+      }
+    }
+
+    // Then check if it is in external library
+    if (externalLib !== 'NONE' && libDeclarations[externalLib] !== undefined) {
+      const link = libDeclarations[externalLib][tokenName];
+      if (link !== undefined) {
+        // go to link
+        window.open(link, "_blank", "noopener noreferrer");
+        return;
+      }
+    }
+
     // We need 1-indexed row here
     const result = lookupDefinition(tokenName, pos.row + 1, pos.column, scopedProgram);
     if (!result) {
