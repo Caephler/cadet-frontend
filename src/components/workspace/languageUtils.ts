@@ -12,6 +12,11 @@ export type Position = {
   column: number;
 };
 
+export type PositionOrLink = {
+  position?: Position,
+  link?: string
+}
+
 // We need to create a [Range](https://ace.c9.io/#nav=api&api=range) object
 // But react-ace does not expose the constructor, so we will use a hacky way to obtain
 // the constructor.
@@ -94,12 +99,11 @@ export const getClosestScoped = (
   pos: Position,
   chapterNumber: number,
   externalLib: string
-): Position | undefined => {
+): PositionOrLink | undefined => {
   const parsedProgram = parseProgram(code, chapterNumber);
 
   const scopedProgram = scopeVariables(parsedProgram as any);
   if (!scopedProgram) {
-    console.log('unable to scope program');
     return;
   }
   const matchedTokens = getMatchingTokens(session, pos, identifierTypes);
@@ -110,10 +114,9 @@ export const getClosestScoped = (
     if (libDeclarations[source_version] !== undefined) {
       const link = libDeclarations[source_version][tokenName];
       if (link !== undefined) {
-        // go to link
-        window.open(link, "_blank", "noopener noreferrer");
-        console.log(`go to ${link}`);
-        return;
+        return {
+          link: link,
+        };
       }
     }
 
@@ -121,9 +124,9 @@ export const getClosestScoped = (
     if (externalLib !== 'NONE' && libDeclarations[externalLib] !== undefined) {
       const link = libDeclarations[externalLib][tokenName];
       if (link !== undefined) {
-        // go to link
-        window.open(link, "_blank", "noopener noreferrer");
-        return;
+        return {
+          link: link,
+        };
       }
     }
 
@@ -136,9 +139,12 @@ export const getClosestScoped = (
     const resRow = result.loc!.start.line;
     const resCol = result.loc!.start.column;
 
-    return {
+    const resultPos = {
       row: resRow,
       column: resCol
+    };
+    return {
+      position: resultPos
     };
   }
 

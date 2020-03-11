@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Card, Text } from '@blueprintjs/core';
+import { Card, Text, Colors } from '@blueprintjs/core';
 
 export interface IOwnProps {
   editor: any;
@@ -111,7 +111,7 @@ class IDEContextMenuHandler extends React.Component<IIDEContextMenuHandlerProps,
             )
             )}
             {shownMenuItems.length === 0 ? (
-              <div style={{ padding: '4px' }}>
+              <div style={{ padding: '4px', color: Colors.LIGHT_GRAY1 }}>
                 <Text><em>No actions available</em></Text>
               </div>
             ) : null }

@@ -3,6 +3,7 @@ import { MapStateToProps, connect } from 'react-redux';
 import { IState } from 'src/reducers/states';
 import IDEContextMenuHandler from './IDEContextMenuHandler';
 import { getAllOccurrencesAtCursor, getClosestScoped, Position, isIdentifierType } from './languageUtils';
+import { showWarningMessage } from '../../utils/notification';
 
 interface IEditorWrapperProps extends IStateProps, OwnProps {}
 export interface IStateProps {
@@ -63,7 +64,8 @@ class EditorWrapper extends React.Component<IEditorWrapperProps, OwnState> {
     this.selectAllOccurrences = (pos: Position) => {
       const editor = this.props.editor;
       const ranges = this.getAllInstances(pos);
-      if (!ranges) {
+      if (!ranges || ranges.length === 0) {
+        showWarningMessage("Unable to refactor.");
         return;
       }
       const selection = editor.getSelection();
@@ -81,11 +83,17 @@ class EditorWrapper extends React.Component<IEditorWrapperProps, OwnState> {
         this.props.chapterNumber,
         this.props.externalLib
       ); // navigateTo expects 0-indexed row, but we are dealing with 1-indexed rows.
-      if (!positionOfDecl) {
+      if (!positionOfDecl || (!positionOfDecl.link === undefined && !positionOfDecl.position === undefined)) {
+        showWarningMessage("No corresponding declaration.");
         return;
       }
-      this.props.editor.navigateTo(positionOfDecl.row - 1, positionOfDecl.column);
-      this.props.editor.focus();
+      if (positionOfDecl.link !== undefined) {
+        window.open(positionOfDecl.link, '_blank', 'noopener noreferrer');
+      } else {
+        const resultPos = positionOfDecl.position!;
+        this.props.editor.navigateTo(resultPos.row - 1, resultPos.column);
+        this.props.editor.focus();
+      }
     };
 
     this.highlightVariables = (pos: Position) => {
