@@ -36,9 +36,14 @@ export interface IEditorProps {
   handleUpdateHasUnsavedChanges?: (hasUnsavedChanges: boolean) => void;
 }
 
+type OnCursorChangeCallback = (pos: Position) => void;
+type Selection = {
+  getCursor: () => Position;
+};
+
 type OwnState = {
   lastCursorPosition: Position;
-  onCursorChangeCallbacks: ((pos: Position) => void)[];
+  onCursorChangeCallback: OnCursorChangeCallback;
 };
 
 class Editor extends React.PureComponent<IEditorProps, OwnState> {
@@ -47,13 +52,13 @@ class Editor extends React.PureComponent<IEditorProps, OwnState> {
   private onChangeMethod: (newCode: string) => void;
   private onValidateMethod: (annotations: Annotation[]) => void;
   private getEditor: () => any;
-  private addOnCursorChangeCallback: (callback: (pos: Position) => void) => void;
+  private changeOnCursorChangeCallback: (callback: (pos: Position) => void) => void;
 
   constructor(props: IEditorProps) {
     super(props);
     this.state = {
       lastCursorPosition: { row: 0, column: 0 },
-      onCursorChangeCallbacks: []
+      onCursorChangeCallback: () => {}
     };
     this.AceEditor = React.createRef();
     this.ShareAce = null;
@@ -76,10 +81,10 @@ class Editor extends React.PureComponent<IEditorProps, OwnState> {
         return ref.editor;
       }
     };
-    this.addOnCursorChangeCallback = (callback: (pos: Position) => void) => {
+    this.changeOnCursorChangeCallback = (callback: (pos: Position) => void) => {
       this.setState(prevState => ({
         ...prevState,
-        onCursorChangeCallbacks: [...prevState.onCursorChangeCallbacks, callback]
+        onCursorChangeCallbacks: callback
       }));
     };
   }
@@ -157,50 +162,11 @@ class Editor extends React.PureComponent<IEditorProps, OwnState> {
 
   public render() {
     return (
-<<<<<<< HEAD
-      <HotKeys className="Editor" handlers={handlers}>
-        <div className="row editor-react-ace">
-          <AceEditor
-            className="react-ace"
-            commands={[
-              {
-                name: 'evaluate',
-                bindKey: {
-                  win: 'Shift-Enter',
-                  mac: 'Shift-Enter'
-                },
-                exec: this.props.handleEditorEval
-              }
-            ]}
-            editorProps={{
-              $blockScrolling: Infinity
-            }}
-            ref={this.AceEditor}
-            markers={this.getMarkers()}
-            fontSize={17}
-            height="100%"
-            highlightActiveLine={false}
-            mode="source"
-            onChange={this.onChangeMethod}
-            onValidate={this.onValidateMethod}
-            theme="source"
-            value={this.props.editorValue}
-            width="100%"
-            setOptions={{
-              fontFamily: "'Inconsolata', 'Consolas', monospace",
-              enableBasicAutocompletion: true,
-              enableLiveAutocompletion: true,
-              enableSnippets: true
-            }}
-          />
-        </div>
-      </HotKeys>
-=======
       <>
         <HotKeys className="Editor" handlers={handlers}>
           <EditorWrapper
             editor={this.getEditor()}
-            addOnCursorChangeCallback={this.addOnCursorChangeCallback}
+            addOnCursorChangeCallback={this.changeOnCursorChangeCallback}
           >
             <AceEditor
               className="react-ace"
@@ -214,12 +180,7 @@ class Editor extends React.PureComponent<IEditorProps, OwnState> {
                   exec: this.props.handleEditorEval
                 }
               ]}
-              onCursorChange={selection => {
-                this.setState({
-                  lastCursorPosition: selection.getCursor()
-                });
-                this.state.onCursorChangeCallbacks.forEach(f => f(selection.getCursor()));
-              }}
+              onCursorChange={this.onCursorChange}
               editorProps={{
                 $blockScrolling: Infinity
               }}
@@ -241,7 +202,6 @@ class Editor extends React.PureComponent<IEditorProps, OwnState> {
           </EditorWrapper>
         </HotKeys>
       </>
->>>>>>> Add initial helper prototype
     );
   }
 
@@ -270,6 +230,13 @@ class Editor extends React.PureComponent<IEditorProps, OwnState> {
     }
     e.stop();
     this.props.handleEditorUpdateBreakpoints(e.editor.session.$breakpoints);
+  };
+
+  private onCursorChange = (selection: Selection) => {
+    this.setState({
+      lastCursorPosition: selection.getCursor()
+    });
+    this.state.onCursorChangeCallback(selection.getCursor());
   };
 
   private handleAnnotationChange = (session: any) => () => {

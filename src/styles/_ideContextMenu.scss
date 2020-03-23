@@ -1,0 +1,30 @@
+.IdeContextMenu {
+  .background {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: transparent;
+    z-index: 1000;
+
+    .context-menu {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      padding: 4px;
+      width: 150px;
+      z-index: 1001;
+
+      .context-menu-item {
+        cursor: pointer;
+        padding: 4px;
+      }
+
+      .context-menu-nonclickable-item {
+        color: $cadet-color-4;
+        padding: 4px;
+      }
+    }
+  }
+}
