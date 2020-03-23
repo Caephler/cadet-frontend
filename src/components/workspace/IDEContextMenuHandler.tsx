@@ -1,5 +1,5 @@
+import { Card, Text } from '@blueprintjs/core';
 import * as React from 'react';
-import { Card, Text, Colors } from '@blueprintjs/core';
 
 export interface IOwnProps {
   editor: any;
@@ -14,26 +14,42 @@ export interface IStateProps {
   y: number;
 }
 
-export interface MenuItem {
+export type MenuItem = {
   label: string;
   fn: (position: Position) => void;
   shouldBeShown: (position: Position) => boolean;
-}
+};
 
 type Position = {
   row: number;
   column: number;
 };
 
-interface IIDEContextMenuHandlerProps extends IOwnProps {}
-
-class IDEContextMenuHandler extends React.Component<IIDEContextMenuHandlerProps, IStateProps> {
+class IDEContextMenuHandler extends React.Component<IOwnProps, IStateProps> {
   private onAltClick: (e: any) => void;
   private openContextMenu: (x: number, y: number) => void;
   private closeContextMenu: () => void;
   private renderContextMenu: () => React.ReactNode;
+  private renderContextMenuItems: () => React.ReactNode;
+  private menuItemMapper: (item: MenuItem, i: number) => React.ReactNode;
 
-  constructor(props: IIDEContextMenuHandlerProps) {
+  private get contextMenuStyle() {
+    return {
+      marginLeft: this.state.x,
+      marginTop: this.state.y,
+      transform: `${this.shouldBeLeft ? 'translateX(-100%)' : ''} ${
+        this.shouldBeTop ? 'translateY(-100%)' : ''
+      }`
+    };
+  }
+  private get shouldBeTop() {
+    return this.state.y > window.innerHeight - 100;
+  }
+  private get shouldBeLeft() {
+    return this.state.x > window.innerWidth - 150;
+  }
+
+  constructor(props: IOwnProps) {
     super(props);
     this.state = {
       isContextMenuOpen: false,
@@ -65,57 +81,47 @@ class IDEContextMenuHandler extends React.Component<IIDEContextMenuHandlerProps,
       });
     };
 
+    this.menuItemMapper = (item: MenuItem, i: number) => {
+      const callback = () => {
+        this.closeContextMenu();
+        item.fn(this.state.coordsWhenOpened);
+      };
+      return (
+        <div key={i} className="context-menu-item" onClick={callback}>
+          <Text>{item.label}</Text>
+        </div>
+      );
+    };
+
+    this.renderContextMenuItems = () => {
+      const pos = this.props.editor.getCursorPosition() as Position;
+      const shownMenuItems = this.props.menuItems.filter(item => item.shouldBeShown(pos));
+
+      return (
+        <>
+          {shownMenuItems.map(this.menuItemMapper)}
+          {shownMenuItems.length === 0 ? (
+            <div className="context-menu-nonclickable-item">
+              <Text>
+                <em>No actions available</em>
+              </Text>
+            </div>
+          ) : null}
+        </>
+      );
+    };
+
     this.renderContextMenu = () => {
       if (!this.state.isContextMenuOpen) {
         return null;
       }
-      const pos = this.props.editor.getCursorPosition() as Position;
-      const shownMenuItems = this.props.menuItems.filter(item => item.shouldBeShown(pos));
       return (
-        <div
-          style={{
-            position: 'fixed',
-            left: 0,
-            top: 0,
-            width: '100%',
-            height: '100%',
-            backgroundColor: 'transparent',
-            zIndex: 1000
-          }}
-          onClick={this.closeContextMenu}
-        >
-          <Card
-            style={{
-              position: 'relative',
-              padding: '4px',
-              width: '150px',
-              marginLeft: this.state.x,
-              marginTop: this.state.y,
-              zIndex: 1001
-            }}
-          >
-            {shownMenuItems.map((item: MenuItem, i) => (
-                <div
-                  key={i}
-                  style={{
-                    cursor: 'pointer',
-                    padding: '4px'
-                  }}
-                  onClick={() => {
-                    this.closeContextMenu();
-                    item.fn(this.state.coordsWhenOpened);
-                  }}
-                >
-                  <Text>{item.label}</Text>
-                </div>
-            )
-            )}
-            {shownMenuItems.length === 0 ? (
-              <div style={{ padding: '4px', color: Colors.LIGHT_GRAY1 }}>
-                <Text><em>No actions available</em></Text>
-              </div>
-            ) : null }
-          </Card>
+        <div className="IdeContextMenu">
+          <div className="background" onClick={this.closeContextMenu}>
+            <Card className="context-menu" style={this.contextMenuStyle}>
+              {this.renderContextMenuItems()}
+            </Card>
+          </div>
         </div>
       );
     };

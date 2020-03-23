@@ -1,11 +1,11 @@
 import {
   createContext,
+  getAllOccurrencesInScope,
   lookupDefinition,
-  scopeVariables,
-  getAllOccurrencesInScope
+  scopeVariables
 } from 'js-slang';
-import { parse, looseParse } from 'js-slang/dist/parser';
-import * as libDeclarations from './lib.json';
+import { looseParse, parse } from 'js-slang/dist/parser';
+import libDeclarations from './lib';
 
 export type Position = {
   row: number;
@@ -13,9 +13,9 @@ export type Position = {
 };
 
 export type PositionOrLink = {
-  position?: Position,
-  link?: string
-}
+  position?: Position;
+  link?: string;
+};
 
 // We need to create a [Range](https://ace.c9.io/#nav=api&api=range) object
 // But react-ace does not expose the constructor, so we will use a hacky way to obtain
@@ -68,7 +68,7 @@ export const getAllOccurrencesAtCursor = (
   const parsedProgram = parseProgram(code, chapterNumber);
 
   const matchedTokens = getMatchingTokens(session, pos, identifierTypes, offsetsToCheck);
-  for (let token of matchedTokens) {
+  for (const token of matchedTokens) {
     const tokenName = token.value;
     const result = getAllOccurrencesInScope(tokenName, pos.row + 1, pos.column, parsedProgram!);
     // We need 1-indexed row here
@@ -107,15 +107,15 @@ export const getClosestScoped = (
     return;
   }
   const matchedTokens = getMatchingTokens(session, pos, identifierTypes);
-  for (let token of matchedTokens) {
+  for (const token of matchedTokens) {
     const tokenName = token.value;
     // First check whether token is in library definitions
-    const source_version = `source_${chapterNumber}`;
-    if (libDeclarations[source_version] !== undefined) {
-      const link = libDeclarations[source_version][tokenName];
+    const sourceVersion = `source_${chapterNumber}`;
+    if (libDeclarations[sourceVersion] !== undefined) {
+      const link = libDeclarations[sourceVersion][tokenName];
       if (link !== undefined) {
         return {
-          link: link,
+          link
         };
       }
     }
@@ -125,7 +125,7 @@ export const getClosestScoped = (
       const link = libDeclarations[externalLib][tokenName];
       if (link !== undefined) {
         return {
-          link: link,
+          link
         };
       }
     }
@@ -152,10 +152,7 @@ export const getClosestScoped = (
   return;
 };
 
-export const isIdentifierType = (
-  session: any,
-  pos: Position,
-): boolean => {
+export const isIdentifierType = (session: any, pos: Position): boolean => {
   const matchedTokens = getMatchingTokens(session, pos, identifierTypes, [-1, 0, 1]);
   return matchedTokens.length > 0;
-}
+};

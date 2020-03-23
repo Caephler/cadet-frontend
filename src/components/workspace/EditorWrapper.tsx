@@ -1,49 +1,68 @@
 import * as React from 'react';
-import { MapStateToProps, connect } from 'react-redux';
+import { connect, MapStateToProps } from 'react-redux';
 import { IState } from 'src/reducers/states';
-import IDEContextMenuHandler from './IDEContextMenuHandler';
-import { getAllOccurrencesAtCursor, getClosestScoped, Position, isIdentifierType } from './languageUtils';
 import { showWarningMessage } from '../../utils/notification';
+import IDEContextMenuHandler, { MenuItem } from './IDEContextMenuHandler';
+import {
+  getAllOccurrencesAtCursor,
+  getClosestScoped,
+  isIdentifierType,
+  Position
+} from './languageUtils';
 
-interface IEditorWrapperProps extends IStateProps, OwnProps {}
+interface IEditorWrapperProps extends IStateProps, IOwnProps {}
 export interface IStateProps {
   chapterNumber: number;
   externalLib: string;
   editorValue: string;
 }
 
-export interface OwnProps {
+export interface IOwnProps {
   editor: any;
   addOnCursorChangeCallback: (callback: (pos: Position) => void) => void;
 }
 
-export interface OwnState {
+export interface IOwnState {
   markerIds: number[];
 }
 
-class EditorWrapper extends React.Component<IEditorWrapperProps, OwnState> {
+type Range = {
+  start: Position;
+  end: Position;
+};
+
+class EditorWrapper extends React.Component<IEditorWrapperProps, IOwnState> {
   private getClosestScoped: (pos: Position) => void;
-  private getAllInstances: (pos: Position) => any[] | undefined;
+  private getAllInstances: (pos: Position) => Range[] | undefined;
   private selectAllOccurrences: (pos: Position) => void;
   private highlightVariables: (pos: Position) => void;
-
-  componentDidMount() {
-    this.props.addOnCursorChangeCallback(pos => {
-      this.highlightVariables(pos);
-    });
-  }
-
-  componentWillReceiveProps(nextProps: IEditorWrapperProps) {
-    if (nextProps.editorValue !== this.props.editorValue) {
-      this.highlightVariables(this.props.editor.getSelection().getCursor());
-    }
-  }
-
+  private menuItems: MenuItem[];
   constructor(props: IEditorWrapperProps) {
     super(props);
     this.state = {
       markerIds: []
     };
+
+    this.menuItems = [
+      {
+        label: 'Refactor',
+        fn: (pos: Position) => {
+          this.selectAllOccurrences(pos);
+        },
+        shouldBeShown: (pos: Position) => {
+          return this.getAllInstances(pos) !== undefined;
+        }
+      },
+      {
+        label: 'Go to declaration',
+        fn: (pos: Position) => {
+          this.getClosestScoped(pos);
+        },
+        shouldBeShown: (pos: Position) => {
+          return isIdentifierType(this.props.editor.getSession(), pos);
+        }
+      }
+    ];
 
     this.getAllInstances = (pos: Position) => {
       const editor = this.props.editor;
@@ -59,13 +78,13 @@ class EditorWrapper extends React.Component<IEditorWrapperProps, OwnState> {
       );
 
       return ranges;
-    }
+    };
 
     this.selectAllOccurrences = (pos: Position) => {
       const editor = this.props.editor;
       const ranges = this.getAllInstances(pos);
       if (!ranges || ranges.length === 0) {
-        showWarningMessage("Unable to refactor.");
+        showWarningMessage('Unable to refactor.');
         return;
       }
       const selection = editor.getSelection();
@@ -83,8 +102,11 @@ class EditorWrapper extends React.Component<IEditorWrapperProps, OwnState> {
         this.props.chapterNumber,
         this.props.externalLib
       ); // navigateTo expects 0-indexed row, but we are dealing with 1-indexed rows.
-      if (!positionOfDecl || (!positionOfDecl.link === undefined && !positionOfDecl.position === undefined)) {
-        showWarningMessage("No corresponding declaration.");
+      if (
+        !positionOfDecl ||
+        (!positionOfDecl.link === undefined && !positionOfDecl.position === undefined)
+      ) {
+        showWarningMessage('No corresponding declaration.');
         return;
       }
       if (positionOfDecl.link !== undefined) {
@@ -131,31 +153,21 @@ class EditorWrapper extends React.Component<IEditorWrapperProps, OwnState> {
     };
   }
 
+  public componentDidMount() {
+    this.props.addOnCursorChangeCallback(pos => {
+      this.highlightVariables(pos);
+    });
+  }
+
+  public componentWillReceiveProps(nextProps: IEditorWrapperProps) {
+    if (nextProps.editorValue !== this.props.editorValue) {
+      this.highlightVariables(this.props.editor.getSelection().getCursor());
+    }
+  }
+
   public render() {
     return (
-      <IDEContextMenuHandler
-        editor={this.props.editor}
-        menuItems={[
-          {
-            label: 'Refactor',
-            fn: (pos: Position) => {
-              this.selectAllOccurrences(pos);
-            },
-            shouldBeShown: (pos: Position) => {
-              return this.getAllInstances(pos) !== undefined;
-            }
-          },
-          {
-            label: 'Go to declaration',
-            fn: (pos: Position) => {
-              this.getClosestScoped(pos);
-            },
-            shouldBeShown: (pos: Position) => {
-              return isIdentifierType(this.props.editor.getSession(), pos);
-            }
-          }
-        ]}
-      >
+      <IDEContextMenuHandler editor={this.props.editor} menuItems={this.menuItems}>
         <div className="row editor-react-ace">{this.props.children}</div>
       </IDEContextMenuHandler>
     );
